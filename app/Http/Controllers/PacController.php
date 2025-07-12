@@ -184,41 +184,7 @@ class PacController extends Controller {
     public function getReport(Request $request) {
         $data = $this->getReportData($request);
 
-        $emited = 0;
-        $received = 0;
-
-        $payroll = 0;
-        $paymentSupplement = 0;
-        $revenue = 0;
-        $expense = 0;
-        $tranlate = 0;
-
-        foreach ($data as $item) {
-
-            if($item['Efecto'] == 'Emitido'){
-                $emited = $emited + 1;
-            } else if($item['Efecto'] == 'Recibido'){
-                $received = $received + 1;
-            }
-
-            switch ($item['Tipo']) {
-                case 'N':
-                    $payroll = $payroll + 1;
-                    break;
-                case 'I':
-                    $revenue = $revenue + 1;
-                    break;
-                case 'E':
-                    $expense = $expense + 1;
-                    break;
-                case 'P':
-                    $paymentSupplement = $paymentSupplement + 1;
-                    break;
-                case 'T':
-                    $tranlate = $tranlate + 1;
-                    break;
-            }
-        }
+        $stats = $this->vaultService->getReportStats($data);
 
         $page = (int) $request->input('page', 1);
         $perPage = (int) $request->input('per_page', 15);
@@ -227,16 +193,26 @@ class PacController extends Controller {
 
         return response()->json([
             'success' => true,
-            'stats' => [
-                'emited' => $emited,
-                'received' => $received,
-                'payrolls' => $payroll,
-                'payment_supplements' => $paymentSupplement,
-                'revenues' => $revenue,
-                'expenses' => $expense,
-                'translates' => $tranlate,
-            ],
+            'stats' => $stats,
             'paged' => $paged,
+        ]);
+    }
+
+    public function getReportStats(Request $request) {
+        $request->validate([
+            'start_date' => 'required|date|before_or_equal:end_date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+
+        $start = $request->input('start_date');
+        $end = $request->input('end_date');
+
+        $data = $this->vaultService->getCfdiReport($start, $end, '', '');
+        $stats = $this->vaultService->getReportStats($data);
+
+        return response()->json([
+            'success' => true,
+            'stats' => $stats,
         ]);
     }
 
@@ -244,7 +220,8 @@ class PacController extends Controller {
         $validator = Validator::make($request->all(), [
             'start_date' => 'required|date|before_or_equal:end_date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'document_type' => 'required|in:I,N,P,E,T'
+            'document_type' => 'required|in:I,N,P,E,T',
+            'type' => 'required|in:emitidas,recibidas',
         ]);
 
         if ($validator->fails()) {
@@ -287,8 +264,8 @@ class PacController extends Controller {
         $validator = Validator::make($request->all(), [
             'start_date' => 'required|date|before_or_equal:end_date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            //'type' => 'required|in:emitidas,recibidas',
-            //'document_type' => 'required|in:I,N,P,E,T'
+            'type' => 'required|in:emitidas,recibidas',
+            'document_type' => 'required|in:I,N,P,E,T'
         ]);
 
         if ($validator->fails()) {

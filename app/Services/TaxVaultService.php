@@ -18,20 +18,24 @@ class TaxVaultService {
         return $this->getCfdiReport($startDate, $endDate, 'emitidas', $docType, $businessId);
     }
 
-    public function getCfdiReport($startDate, $endDate, $type, $docType, $businessId) {
+    public function getCfdiReport($startDate, $endDate, $type, $docType) {
         $url = "{$this->BASE_URL}/ws/doReporte";
-
-        $rfc = $this->RFC;
 
         $formData = [
             ['name' => 'fFinal', 'contents' => $endDate],
             ['name' => 'fInicial', 'contents' => $startDate],
-           // ['name' => 'tipoDeComprobante', 'contents' => $docType],
-           // ['name' => 'tipo', 'contents' =>  $type],
             ['name' => 'apikey', 'contents' => $this->API_KEY],
-            ['name' => 'rfc', 'contents' => $rfc],
+            ['name' => 'rfc', 'contents' =>  $this->RFC],
             ['name' => 'layout', 'contents' => 'GBM170505Q78_1']
         ];
+
+        if ($type !== null && $type !== '') {
+            $formData[] = ['name' => 'tipo', 'contents' => $type];
+        }
+
+        if ($docType !== null && $docType !== '') {
+            $formData[] = ['name' => 'tipoDeComprobante', 'contents' => $docType];
+        }
 
         $response = Http::asMultipart()->post($url, $formData)->json();
 
@@ -46,17 +50,15 @@ class TaxVaultService {
         return $response['data'];
     }
 
-    public function exportReportData($startDate, $endDate, $docType, $businessId) {
+    public function exportReportData($startDate, $endDate, $docType) {
         $url = "{$this->BASE_URL}/ws/descargaCFDI";
-
-         $rfc = $this->RFC;
 
         $formData = [
             ['name' => 'fFinal', 'contents' => $endDate],
             ['name' => 'fInicial', 'contents' => $startDate],
             ['name' => 'tipoDeComprobante', 'contents' => $docType],
             ['name' => 'apikey', 'contents' => $this->API_KEY],
-            ['name' => 'rfc', 'contents' => $rfc],
+            ['name' => 'rfc', 'contents' => $this->RFC],
         ];
 
         $response = Http::asMultipart()->post($url, $formData)->json();
@@ -71,5 +73,39 @@ class TaxVaultService {
         $zip = base64_decode($response['zip']);
 
         return $zip;
+    }
+
+    public function getReportStats(array $data): array {
+        $stats = [
+            'emited' => 0,
+            'received' => 0,
+            'payrolls' => 0,
+            'payment_supplements' => 0,
+            'revenues' => 0,
+            'expenses' => 0,
+            'translates' => 0,
+        ];
+
+        $typeMapping = [
+            'N' => 'payrolls',
+            'I' => 'revenues',
+            'E' => 'expenses',
+            'P' => 'payment_supplements',
+            'T' => 'translates',
+        ];
+
+        foreach ($data as $item) {
+            if ($item['Efecto'] === 'Emitido') {
+                $stats['emited']++;
+            } elseif ($item['Efecto'] === 'Recibido') {
+                $stats['received']++;
+            }
+
+            if (isset($typeMapping[$item['Tipo']])) {
+                $stats[$typeMapping[$item['Tipo']]]++;
+            }
+        }
+
+        return $stats;
     }
 }

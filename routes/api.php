@@ -8,6 +8,7 @@ Route::controller(PacController::class)->prefix('pac')->group(function() {
     Route::post('/report', 'getReport');
     Route::post('/export_report', 'exportReport');
     Route::post('/download_files', 'exportReportData');
+    Route::post('/report_stats', 'getReportStats');
 });
 
 Route::controller(StatusController::class)->prefix('status')->group(function() {
