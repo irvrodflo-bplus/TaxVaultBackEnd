@@ -17,6 +17,7 @@ Route::controller(LocalVaultController::class)->prefix('local_vault')->group(fun
     Route::post('/report', 'getReport');
     Route::post('/export_report', 'exportReport');
     Route::post('/report_stats', 'getReportStats');
+    Route::get('/analythics/{year}', 'getYearReport');
 });
 
 Route::controller(StatusController::class)->prefix('status')->group(function() {

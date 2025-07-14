@@ -28,6 +28,66 @@ class LocalVaultController extends Controller {
         $this->excelService = $excelService;
     }
 
+    public function getYearReport(int $year) {
+        $currentYear = date('Y');
+        $minYear = $currentYear - 3;
+
+        if ($year < $minYear || $year > $currentYear) {
+            return response()->json([
+                'error' => 'Invalid year'
+            ], 422);
+        }
+
+        $totalsByMonth = [];
+        $totalCountI = 0;
+        $totalCountE = 0;
+
+        for ($month = 1; $month <= 12; $month++) {
+            $start = date("$year-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-01");
+            $end = date("$year-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-" . date('t', strtotime($start)));
+
+            $emitedRevenue = LocalVaultEmitted::getSumTotalByPeriodAndType($start, $end, 'I');
+            $receivedRevenue = LocalVaultReceived::getSumTotalByPeriodAndType($start, $end, 'I');
+
+            $emitedExpense = LocalVaultEmitted::getSumTotalByPeriodAndType($start, $end, 'E');
+            $receivedExpense = LocalVaultReceived::getSumTotalByPeriodAndType($start, $end, 'E');
+
+            $emitedCountI = LocalVaultEmitted::getCountByPeriodAndType($start, $end, 'I');
+            $receivedCountI = LocalVaultReceived::getCountByPeriodAndType($start, $end, 'I');
+            $emitedCountE = LocalVaultEmitted::getCountByPeriodAndType($start, $end, 'E');
+            $receivedCountE = LocalVaultReceived::getCountByPeriodAndType($start, $end, 'E');
+
+            $monthlyCountI = $emitedCountI + $receivedCountI;
+            $monthlyCountE = $emitedCountE + $receivedCountE;
+
+            $totalCountI += $monthlyCountI;
+            $totalCountE += $monthlyCountE;
+
+            $totalsByMonth[] = [
+                'month' => $month,
+                'revenue' => $emitedRevenue + $receivedRevenue,
+                'expense' => $emitedExpense + $receivedExpense,
+                'count_revenue' => $monthlyCountI,
+                'count_expense' => $monthlyCountE,
+            ];
+        }
+
+        $totalRevenue = array_sum(array_column($totalsByMonth, 'revenue'));
+        $totalExpense = array_sum(array_column($totalsByMonth, 'expense'));
+
+        return response()->json([
+            'success' => true,
+            'totals' => [
+                'revenue' => $totalRevenue,
+                'expense' => $totalExpense,
+                'balance' => $totalRevenue - $totalExpense,
+                'count_revenue' => $totalCountI,
+                'count_expense' => $totalCountE,
+            ],
+            'monthly' => $totalsByMonth
+        ]);
+    }
+
     public function getReportStats(Request $request) {
         $request->validate([
             'start_date' => 'required|date|before_or_equal:end_date',
