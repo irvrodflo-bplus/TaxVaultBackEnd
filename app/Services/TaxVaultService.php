@@ -37,7 +37,10 @@ class TaxVaultService {
             $formData[] = ['name' => 'tipoDeComprobante', 'contents' => $docType];
         }
 
-        $response = Http::asMultipart()->post($url, $formData)->json();
+        $response = Http::timeout(420)
+            ->asMultipart()
+            ->post($url, $formData)
+            ->json();
 
         if (!is_array($response) 
             || !isset($response['codigo'], $response['data']) 
@@ -61,7 +64,10 @@ class TaxVaultService {
             ['name' => 'rfc', 'contents' => $this->RFC],
         ];
 
-        $response = Http::asMultipart()->post($url, $formData)->json();
+        $response = Http::timeout(420)
+            ->asMultipart()
+            ->post($url, $formData)
+            ->json();
 
         if (!is_array($response) 
             || !isset($response['codigo'], $response['zip']) 
@@ -77,8 +83,60 @@ class TaxVaultService {
 
     public function getReportStats(array $data): array {
         $stats = [
-            'emited' => 0,
-            'received' => 0,
+            'emited' => [
+                'total' => 0,
+                'payrolls' => 0,
+                'payment_supplements' => 0,
+                'revenues' => 0,
+                'expenses' => 0,
+                'translates' => 0,
+            ],
+            'received' => [
+                'total' => 0,
+                'payrolls' => 0,
+                'payment_supplements' => 0,
+                'revenues' => 0,
+                'expenses' => 0,
+                'translates' => 0,
+            ],
+        ];
+
+        $typeMapping = [
+            'N' => 'payrolls',
+            'I' => 'revenues',
+            'E' => 'expenses',
+            'P' => 'payment_supplements',
+            'T' => 'translates',
+        ];
+
+        foreach ($data as $item) {
+            if (!isset($item['Efecto'], $item['Tipo'])) {
+                continue;
+            }
+
+            if ($item['Efecto'] === 'Emitido') {
+                $stats['emited']['total']++;
+
+                if (isset($typeMapping[$item['Tipo']])) {
+                    $key = $typeMapping[$item['Tipo']];
+                    $stats['emited'][$key]++;
+                }
+            } elseif ($item['Efecto'] === 'Recibido') {
+                $stats['received']['total']++;
+
+                if (isset($typeMapping[$item['Tipo']])) {
+                    $key = $typeMapping[$item['Tipo']];
+                    $stats['received'][$key]++;
+                }
+            }
+        }
+
+        return $stats;
+    }
+
+    public function getLocalSimpleStats(array $data): array {
+        $stats = [
+            'total' => 0,
             'payrolls' => 0,
             'payment_supplements' => 0,
             'revenues' => 0,
@@ -95,14 +153,17 @@ class TaxVaultService {
         ];
 
         foreach ($data as $item) {
-            if ($item['Efecto'] === 'Emitido') {
-                $stats['emited']++;
-            } elseif ($item['Efecto'] === 'Recibido') {
-                $stats['received']++;
+            if (!isset($item['tipo_comprobante'])) {
+                continue;
             }
 
-            if (isset($typeMapping[$item['Tipo']])) {
-                $stats[$typeMapping[$item['Tipo']]]++;
+            $stats['total']++;
+
+            $tipo = $item['tipo_comprobante'];
+
+            if (isset($typeMapping[$tipo])) {
+                $key = $typeMapping[$tipo];
+                $stats[$key]++;
             }
         }
 
