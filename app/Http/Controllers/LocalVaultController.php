@@ -29,63 +29,81 @@ class LocalVaultController extends Controller {
     }
 
     public function getYearReport(int $year) {
-        $currentYear = date('Y');
-        $minYear = $currentYear - 3;
+        $result = [
+            'data' => [],
+            'total' => [
+                'count_emitted' => 0,
+                'count_received' => 0,
+                'total_emitted' => 0,
+                'total_received' => 0
+            ]
+        ];
+        
+        $documentTypes = ['I', 'E', 'P', 'N', 'T'];
 
-        if ($year < $minYear || $year > $currentYear) {
-            return response()->json([
-                'error' => 'Invalid year'
-            ], 422);
-        }
-
-        $totalsByMonth = [];
-        $totalCountI = 0;
-        $totalCountE = 0;
-
-        for ($month = 1; $month <= 12; $month++) {
-            $start = date("$year-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-01");
-            $end = date("$year-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-" . date('t', strtotime($start)));
-
-            $emitedRevenue = LocalVaultEmitted::getSumTotalByPeriodAndType($start, $end, 'I');
-            $receivedRevenue = LocalVaultReceived::getSumTotalByPeriodAndType($start, $end, 'I');
-
-            $emitedExpense = LocalVaultEmitted::getSumTotalByPeriodAndType($start, $end, 'E');
-            $receivedExpense = LocalVaultReceived::getSumTotalByPeriodAndType($start, $end, 'E');
-
-            $emitedCountI = LocalVaultEmitted::getCountByPeriodAndType($start, $end, 'I');
-            $receivedCountI = LocalVaultReceived::getCountByPeriodAndType($start, $end, 'I');
-            $emitedCountE = LocalVaultEmitted::getCountByPeriodAndType($start, $end, 'E');
-            $receivedCountE = LocalVaultReceived::getCountByPeriodAndType($start, $end, 'E');
-
-            $monthlyCountI = $emitedCountI + $receivedCountI;
-            $monthlyCountE = $emitedCountE + $receivedCountE;
-
-            $totalCountI += $monthlyCountI;
-            $totalCountE += $monthlyCountE;
-
-            $totalsByMonth[] = [
-                'month' => $month,
-                'revenue' => $emitedRevenue + $receivedRevenue,
-                'expense' => $emitedExpense + $receivedExpense,
-                'count_revenue' => $monthlyCountI,
-                'count_expense' => $monthlyCountE,
+        foreach ($documentTypes as $type) {
+            $result['data'][$type] = [
+                'monthly' => array_fill(0, 12, [
+                    'number' => 0,
+                    'count_emitted' => 0,
+                    'count_received' => 0,
+                    'total_emitted' => 0,
+                    'total_received' => 0
+                ]),
+                'total' => [
+                    'count_emitted' => 0,
+                    'count_received' => 0,
+                    'total_emitted' => 0,
+                    'total_received' => 0
+                ]
             ];
         }
 
-        $totalRevenue = array_sum(array_column($totalsByMonth, 'revenue'));
-        $totalExpense = array_sum(array_column($totalsByMonth, 'expense'));
+        $emittedData = LocalVaultEmitted::whereYear('fecha_expedicion', $year)
+            ->selectRaw('MONTH(fecha_expedicion) as month, tipo_comprobante as type, COUNT(*) as count, SUM(total) as sum')
+            ->groupBy('month', 'type')
+            ->get();
 
-        return response()->json([
-            'success' => true,
-            'totals' => [
-                'revenue' => $totalRevenue,
-                'expense' => $totalExpense,
-                'balance' => $totalRevenue - $totalExpense,
-                'count_revenue' => $totalCountI,
-                'count_expense' => $totalCountE,
-            ],
-            'monthly' => $totalsByMonth
-        ]);
+        $receivedData = LocalVaultReceived::whereYear('fecha_expedicion', $year)
+            ->selectRaw('MONTH(fecha_expedicion) as month, tipo_comprobante as type, COUNT(*) as count, SUM(total) as sum')
+            ->groupBy('month', 'type')
+            ->get();
+
+        foreach ($emittedData as $data) {
+            $month = $data->month - 1; 
+            $type = $data->type;
+            
+            if (isset($result['data'][$type])) {
+                $result['data'][$type]['monthly'][$month]['number'] = $data->month;
+                $result['data'][$type]['monthly'][$month]['count_emitted'] = $data->count;
+                $result['data'][$type]['monthly'][$month]['total_emitted'] = $data->sum;
+                
+                $result['data'][$type]['total']['count_emitted'] += $data->count;
+                $result['data'][$type]['total']['total_emitted'] += $data->sum;
+                
+                $result['total']['count_emitted'] += $data->count;
+                $result['total']['total_emitted'] += $data->sum;
+            }
+        }
+
+        foreach ($receivedData as $data) {
+            $month = $data->month - 1;
+            $type = $data->type;
+            
+            if (isset($result['data'][$type])) {
+                $result['data'][$type]['monthly'][$month]['number'] = $data->month;
+                $result['data'][$type]['monthly'][$month]['count_received'] = $data->count;
+                $result['data'][$type]['monthly'][$month]['total_received'] = $data->sum;
+                
+                $result['data'][$type]['total']['count_received'] += $data->count;
+                $result['data'][$type]['total']['total_received'] += $data->sum;
+                
+                $result['total']['count_received'] += $data->count;
+                $result['total']['total_received'] += $data->sum;
+            }
+        }
+
+        return $result;
     }
 
     public function getReportStats(Request $request) {

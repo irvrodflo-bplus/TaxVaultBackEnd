@@ -72,6 +72,7 @@ class TaxVaultService {
         if (!is_array($response) 
             || !isset($response['codigo'], $response['zip']) 
             || $response['codigo'] != 200
+            
         ) {
             throw new \Exception("Connection with tax vault failed");
         }

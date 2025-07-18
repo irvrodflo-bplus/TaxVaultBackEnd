@@ -18,7 +18,7 @@ Route::controller(LocalVaultController::class)->prefix('local_vault')->group(fun
     Route::post('/report', 'getReport');
     Route::post('/export_report', 'exportReport');
     Route::post('/report_stats', 'getReportStats');
-    Route::get('/analythics/{year}', 'getYearReport');
+    Route::get('/analytics/{year}', 'getYearReport');
 });
 
 Route::controller(SyncController::class)->prefix('sync')->group(function() {
