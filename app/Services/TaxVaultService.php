@@ -37,10 +37,12 @@ class TaxVaultService {
             $formData[] = ['name' => 'tipoDeComprobante', 'contents' => $docType];
         }
 
-        $response = Http::timeout(420)
-            ->asMultipart()
-            ->post($url, $formData)
-            ->json();
+        $response = Http::withOptions([
+            'timeout' => 80,      
+            'connect_timeout' => 100
+        ])->asMultipart()
+        ->post($url, $formData)
+        ->json();
 
         if (!is_array($response) 
             || !isset($response['codigo'], $response['data']) 
